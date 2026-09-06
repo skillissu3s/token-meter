@@ -48,10 +48,32 @@ public sealed class Settings
         try
         {
             if (System.IO.File.Exists(File))
-                return JsonSerializer.Deserialize<Settings>(System.IO.File.ReadAllText(File)) ?? new Settings();
+            {
+                var loaded = JsonSerializer.Deserialize<Settings>(System.IO.File.ReadAllText(File));
+                if (loaded is not null) return loaded.Migrated();
+            }
         }
         catch { /* a corrupt settings file should never stop the tray from starting */ }
         return new Settings();
+    }
+
+    /// <summary>
+    /// Budgets used to be token counts and are now equivalent spend. A file written by the older
+    /// build would leave a budget of "88000000 dollars", pinning every gauge at 0% forever, so
+    /// anything that large is treated as stale and replaced with this plan's starting point.
+    /// </summary>
+    Settings Migrated()
+    {
+        const double implausible = 100_000;
+        var fallback = ClaudePlans.TryGetValue(ClaudePlan, out var plan) && plan.FiveHour > 0
+            ? plan
+            : ClaudePlans["max5"];
+
+        if (ClaudeFiveHourBudget >= implausible) ClaudeFiveHourBudget = fallback.FiveHour;
+        if (ClaudeWeeklyBudget >= implausible) ClaudeWeeklyBudget = fallback.Weekly;
+        if (CodexFiveHourBudget >= implausible) CodexFiveHourBudget = new Settings().CodexFiveHourBudget;
+        if (CodexWeeklyBudget >= implausible) CodexWeeklyBudget = new Settings().CodexWeeklyBudget;
+        return this;
     }
 
     public void Save()

@@ -19,7 +19,7 @@ Each tool exposes a different shape of information, so each gets a view that sui
 | Tool | What you see | Where it comes from |
 | --- | --- | --- |
 | **Claude Code** | 5-hour and weekly windows against your plan budget, with pace, today's tokens, output vs. thinking, cache hit rate, per-project breakdown | `~/.claude/projects/**/*.jsonl` — the `message.usage` block on every assistant turn |
-| **Codex** | The **real** 5-hour and weekly limit percentages OpenAI sends back, with live reset countdowns, plus reasoning and cached-input tokens | `~/.codex/sessions/**/*.jsonl` (`token_count` events carry a `rate_limits` block), falling back to `~/.codex/state_5.sqlite` |
+| **Codex** | The **real** limit percentages OpenAI sends back, with live reset countdowns, plus reasoning and cached-input tokens. Which windows appear depends on your plan — a free account reports a single 30-day window, paid ones report a session and a weekly window — and a local 5-hour estimate fills in when no short window is reported | `~/.codex/sessions/**/*.jsonl` (`token_count` events carry a `rate_limits` block), falling back to `~/.codex/state_5.sqlite` |
 | **OpenCode** | Spend-led: weekly spend against a budget you set, cost per provider and model, per-project cost — because OpenCode runs on your own API keys and records real dollars | `~/.local/share/opencode/opencode.db` |
 | **Antigravity** | Detection status, then spend and token totals once it has data to give | `~/.antigravity`, `%APPDATA%\Antigravity` and the other known locations |
 
@@ -143,6 +143,14 @@ Stored as plain JSON in `%APPDATA%\TokenMeter\settings.json`, editable either in
 
 That writes the exact payload the UI renders, then exits without touching the tray.
 
+## Verifying
+
+```bash
+dotnet run --project tools/Verify
+```
+
+Runs every collector against fixture data it has never seen — including the exact shape a free Codex plan returns — plus the window anchoring, calibration, settings migration and round-tripping, and behaviour on corrupt input. It prints a pass/fail line per check and exits non-zero on failure. It touches nothing outside a temp folder, and restores your real `settings.json` afterwards.
+
 ## Layout
 
 ```
@@ -152,6 +160,7 @@ src/TokenMeter/
   UI/             tray icon, the two windows, the WebView2 bridge
   web/            the interface itself: one HTML file, one stylesheet, one script
 tools/IconGen/    generates the coin .ico
+tools/Verify/     the check suite described above
 ```
 
 Adding a fifth tool means writing one `IUsageCollector`, returning gauges and stats, and adding it to the list in `Core/UsageService.cs`. The UI renders whatever a collector reports.

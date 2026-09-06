@@ -30,6 +30,7 @@ public sealed class CodexCollector : IUsageCollector
     }
 
     RateWindow? _primary, _secondary;
+    string? _planType;
 
     public ProviderSnapshot Collect(Settings s)
     {
@@ -42,10 +43,12 @@ public sealed class CodexCollector : IUsageCollector
             return snap;
         }
 
-        snap.Account = ReadAccountPlan();
-
         _primary = _secondary = null;
+        _planType = null;
         var records = ReadRollouts();
+
+        // The rollout knows the actual plan; auth.json only shows how you signed in.
+        snap.Account = _planType ?? ReadAccountPlan();
         if (records.Count == 0) records = ReadStateDb();
 
         if (records.Count == 0)
@@ -60,14 +63,26 @@ public sealed class CodexCollector : IUsageCollector
 
         var cache = s.CountCacheReads;
 
-        // Prefer the numbers the server reported. Fall back to local budgets only when absent.
-        snap.Gauges.Add(_primary is not null
-            ? Reported(_primary)
-            : Budget(records, TimeSpan.FromHours(5), "5-hour window", s.CodexFiveHourBudget));
+        // Show whatever OpenAI actually reported, shortest window first. Which windows come back
+        // varies by plan — a free account reports one 30-day window and no secondary at all — so
+        // the local estimate is only used to fill a gap, never to duplicate a reported window.
+        var reported = new[] { _primary, _secondary }
+            .Where(w => w is not null && w.WindowMinutes > 0)
+            .Select(w => w!)
+            .GroupBy(w => w.WindowMinutes)
+            .Select(g => g.First())
+            .OrderBy(w => w.WindowMinutes)
+            .ToList();
 
-        snap.Gauges.Add(_secondary is not null
-            ? Reported(_secondary)
-            : Budget(records, TimeSpan.FromDays(7), "Weekly window", s.CodexWeeklyBudget));
+        foreach (var w in reported) snap.Gauges.Add(Reported(w));
+
+        // Without a short reported window there is no session view, so estimate one locally.
+        const int sixHours = 360;
+        if (!reported.Any(w => w.WindowMinutes <= sixHours))
+            snap.Gauges.Add(Budget(records, TimeSpan.FromHours(5), "5-hour window", s.CodexFiveHourBudget));
+
+        if (reported.Count == 0)
+            snap.Gauges.Add(Budget(records, TimeSpan.FromDays(7), "Weekly window", s.CodexWeeklyBudget));
 
         var today = Aggregate.Today(records).ToList();
         snap.Stats.Add(new Stat { Label = "Today", Value = Fmt.Tokens(snap.TokensToday), Sub = Fmt.Count(today.Count, "turn") });
@@ -128,8 +143,9 @@ public sealed class CodexCollector : IUsageCollector
         <= 0 => "Usage window",
         < 90 => minutes + "-minute window",
         < 1440 => (minutes / 60) + "-hour window",
-        < 10080 => (minutes / 1440) + "-day window",
-        _ => "Weekly window",
+        10080 => "Weekly window",
+        // A free plan reports 43200 minutes, which is a month, not a week.
+        _ => (minutes / 1440) + "-day window",
     };
 
     List<UsageRecord> ReadRollouts()
@@ -231,6 +247,8 @@ public sealed class CodexCollector : IUsageCollector
                     var ts = ParseTs(doc.RootElement) ?? f.LastWriteTimeUtc;
                     Take(rl, "primary", ts, ref _primary);
                     Take(rl, "secondary", ts, ref _secondary);
+                    if (rl.TryGetProperty("plan_type", out var pt) && pt.ValueKind == JsonValueKind.String)
+                        _planType = pt.GetString();
                 }
             }
         }
@@ -240,14 +258,21 @@ public sealed class CodexCollector : IUsageCollector
         {
             if (!rl.TryGetProperty(name, out var w) || w.ValueKind != JsonValueKind.Object) return;
             if (slot is not null && slot.ObservedUtc >= ts) return;
-            var resets = Num(w, "resets_in_seconds");
+
+            // Codex sends either an absolute reset time or a countdown, depending on version.
+            var resetsAt = Num(w, "resets_at");
+            var resetsIn = Num(w, "resets_in_seconds");
+            DateTime? resets = resetsAt > 0 ? DateTimeOffset.FromUnixTimeSeconds(resetsAt).UtcDateTime
+                : resetsIn > 0 ? ts.AddSeconds(resetsIn)
+                : null;
+
             slot = new RateWindow
             {
                 UsedPercent = w.TryGetProperty("used_percent", out var up) && up.ValueKind == JsonValueKind.Number
                     ? up.GetDouble() : 0,
                 WindowMinutes = (int)Num(w, "window_minutes"),
                 ObservedUtc = ts,
-                ResetsAtUtc = resets > 0 ? ts.AddSeconds(resets) : null,
+                ResetsAtUtc = resets,
             };
         }
     }
