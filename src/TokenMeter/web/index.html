@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Token Meter</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="boot">
+      <svg class="boot-mark" viewBox="0 0 100 100" aria-hidden="true"><use href="#coin" /></svg>
+      <p>reading local usage</p>
+    </div>
+  </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- Filled disc with the rim knocked out, matching UI/CoinGlyph.cs. -->
+      <path id="coin" fill="currentColor" fill-rule="evenodd"
+            d="M50 4a46 46 0 1 0 0 92a46 46 0 1 0 0-92Z
+               M50 13.25a36.75 36.75 0 1 0 0 73.5a36.75 36.75 0 1 0 0-73.5Z
+               M50 20.75a29.25 29.25 0 1 0 0 58.5a29.25 29.25 0 1 0 0-58.5Z" />
+    </defs>
+  </svg>
+
+  <script src="app.js"></script>
+</body>
+</html>
