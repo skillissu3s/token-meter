@@ -58,10 +58,39 @@ public sealed class ClaudeCodeCollector : IUsageCollector
 
         var cache = s.CountCacheReads;
 
-        // Both windows are anchored to the first call after the previous one expired, which is how
-        // these limits actually behave and what makes elapsed time and pace meaningful.
-        snap.Gauges.Add(Window(records, TimeSpan.FromHours(5), "5-hour window", s.ClaudeFiveHourBudget, cache));
-        snap.Gauges.Add(Window(records, TimeSpan.FromDays(7), "Weekly window", s.ClaudeWeeklyBudget, cache));
+        // The 5-hour window is anchored to the first call after the previous one expired, which is
+        // how the limit behaves and what makes elapsed time and pace meaningful.
+        var (blockStart, blockEnd) = Aggregate.CurrentBlock(records, TimeSpan.FromHours(5));
+        var blockUsed = Aggregate.SumWeighted(records.Where(r => r.TsUtc >= blockStart));
+        snap.Gauges.Add(new Gauge
+        {
+            Label = "5-hour window",
+            Sub = Fmt.Money(blockUsed) + " of " + Fmt.Money(s.ClaudeFiveHourBudget),
+            Percent = Fmt.Pct(blockUsed, s.ClaudeFiveHourBudget),
+            Raw = blockUsed,
+            Value = Fmt.Money(blockUsed),
+            WindowStartUtc = blockStart,
+            ResetsAtUtc = blockEnd,
+        });
+
+        // The weekly figure is a rolling 7-day sum. It deliberately has no window start: we cannot
+        // know where Anthropic's week began, and a rolling total has no elapsed time to pace against.
+        var weekUsed = Aggregate.SumWeighted(Aggregate.Since(records, DateTime.UtcNow.AddDays(-7)));
+        var historyDays = (DateTime.UtcNow - records[0].TsUtc).TotalDays;
+        snap.Gauges.Add(new Gauge
+        {
+            Label = "Weekly, rolling 7 days",
+            Sub = historyDays < 6.5
+                ? Fmt.Money(weekUsed) + " of " + Fmt.Money(s.ClaudeWeeklyBudget) + " · only "
+                  + Fmt.Span(historyDays) + " of history here"
+                : Fmt.Money(weekUsed) + " of " + Fmt.Money(s.ClaudeWeeklyBudget),
+            Percent = Fmt.Pct(weekUsed, s.ClaudeWeeklyBudget),
+            Raw = weekUsed,
+            Value = Fmt.Money(weekUsed),
+            // Solving a weekly budget from a few hours of transcripts would bake in a badly wrong
+            // number, so calibration stays shut until a full week has accumulated locally.
+            Calibratable = historyDays >= 6.5,
+        });
 
         var today = Aggregate.Today(records).ToList();
         var todayOut = today.Sum(r => r.Output);
@@ -95,23 +124,6 @@ public sealed class ClaudeCodeCollector : IUsageCollector
             .Take(8));
 
         return snap;
-    }
-
-    static Gauge Window(IReadOnlyList<UsageRecord> records, TimeSpan length, string label,
-        long budget, bool countCacheReads)
-    {
-        var (start, end) = Aggregate.CurrentBlock(records, length);
-        var used = Aggregate.Sum(records.Where(r => r.TsUtc >= start), countCacheReads);
-        return new Gauge
-        {
-            Label = label,
-            Sub = Fmt.Tokens(used) + " of " + Fmt.Tokens(budget),
-            Percent = Fmt.Pct(used, budget),
-            Value = Fmt.Tokens(used),
-            WindowStartUtc = start,
-            ResetsAtUtc = end,
-            Authoritative = false,
-        };
     }
 
     static List<UsageRecord> ParseFile(FileInfo f)

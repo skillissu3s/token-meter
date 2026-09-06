@@ -226,20 +226,25 @@ public sealed class TrayApp : ApplicationContext
     {
         if (p.ValueKind != JsonValueKind.Object) return;
 
+        var planChanged = Str(p, "claudePlan") is { } chosen && chosen != _settings.ClaudePlan;
         _settings.ClaudePlan = Str(p, "claudePlan") ?? _settings.ClaudePlan;
-        if (Settings.ClaudePlans.TryGetValue(_settings.ClaudePlan, out var plan) && plan.FiveHour > 0)
+
+        // Picking a plan loads its starting numbers; otherwise whatever is in the boxes wins.
+        if (planChanged && Settings.ClaudePlans.TryGetValue(_settings.ClaudePlan, out var plan) && plan.FiveHour > 0)
         {
             _settings.ClaudeFiveHourBudget = plan.FiveHour;
             _settings.ClaudeWeeklyBudget = plan.Weekly;
         }
         else
         {
-            _settings.ClaudeFiveHourBudget = Long(p, "claudeFiveHourBudget", _settings.ClaudeFiveHourBudget);
-            _settings.ClaudeWeeklyBudget = Long(p, "claudeWeeklyBudget", _settings.ClaudeWeeklyBudget);
+            _settings.ClaudeFiveHourBudget = Dbl(p, "claudeFiveHourBudget", _settings.ClaudeFiveHourBudget);
+            _settings.ClaudeWeeklyBudget = Dbl(p, "claudeWeeklyBudget", _settings.ClaudeWeeklyBudget);
         }
 
-        _settings.CodexFiveHourBudget = Long(p, "codexFiveHourBudget", _settings.CodexFiveHourBudget);
-        _settings.CodexWeeklyBudget = Long(p, "codexWeeklyBudget", _settings.CodexWeeklyBudget);
+        Calibrate(p);
+
+        _settings.CodexFiveHourBudget = Dbl(p, "codexFiveHourBudget", _settings.CodexFiveHourBudget);
+        _settings.CodexWeeklyBudget = Dbl(p, "codexWeeklyBudget", _settings.CodexWeeklyBudget);
         _settings.OpenCodeWeeklyBudget = Dbl(p, "openCodeWeeklyBudget", _settings.OpenCodeWeeklyBudget);
         _settings.AntigravityWeeklyBudget = Dbl(p, "antigravityWeeklyBudget", _settings.AntigravityWeeklyBudget);
         _settings.CountCacheReads = Bool(p, "countCacheReads", _settings.CountCacheReads);
@@ -247,6 +252,26 @@ public sealed class TrayApp : ApplicationContext
 
         _timer.Interval = _settings.RefreshSeconds * 1000;
         _settings.Save();
+    }
+
+    /// <summary>
+    /// Claude Code shows you the real percentage; Token Meter cannot read it. So take that number
+    /// as an observation and solve for the budget that would have produced it. One reading makes
+    /// the gauge track properly from then on, which is the only accurate route available offline.
+    /// </summary>
+    void Calibrate(JsonElement p)
+    {
+        var claude = _usage.Latest.Providers.FirstOrDefault(x => x.Id == "claude");
+        if (claude is null || claude.Gauges.Count < 2) return;
+
+        Apply(Dbl(p, "calibrateFiveHour", 0), claude.Gauges[0], v => _settings.ClaudeFiveHourBudget = v);
+        Apply(Dbl(p, "calibrateWeekly", 0), claude.Gauges[1], v => _settings.ClaudeWeeklyBudget = v);
+
+        static void Apply(double observedPercent, Gauge gauge, Action<double> set)
+        {
+            if (observedPercent is <= 0 or > 100 || gauge.Raw <= 0 || !gauge.Calibratable) return;
+            set(Math.Round(gauge.Raw / (observedPercent / 100d), 2));
+        }
     }
 
     async Task PushSettingsAsync()

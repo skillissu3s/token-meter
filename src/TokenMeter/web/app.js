@@ -338,6 +338,11 @@ function providerColumn(p) {
 
 /* ---------------- settings ---------------- */
 
+function weeklyCalibratable() {
+  const claude = (state.snapshot?.providers || []).find((p) => p.id === 'claude');
+  return !!claude?.gauges?.[1]?.calibratable;
+}
+
 function settingsBody() {
   const c = state.settings || {};
   const plans = [['pro', 'claude pro'], ['max5', 'claude max 5x'], ['max20', 'claude max 20x'], ['custom', 'custom']];
@@ -350,12 +355,19 @@ function settingsBody() {
   return `
     <div class="sec-label">settings &middot; %APPDATA%\\TokenMeter</div>
     <div class="set">
-      ${field('claude plan', 'Anthropic publishes no token limits, so these are targets you set',
+      ${field('calibrate 5-hour', 'type the % Claude Code is showing right now and the budget is solved for you',
+        `<input type="number" step="1" min="0" max="100" placeholder="%" data-set="calibrateFiveHour" value="" />`)}
+      ${weeklyCalibratable()
+        ? field('calibrate weekly', 'same, for the weekly figure',
+            `<input type="number" step="1" min="0" max="100" placeholder="%" data-set="calibrateWeekly" value="" />`)
+        : field('calibrate weekly', 'needs a full week of local history first — until then the weekly figure only counts what this machine has recorded',
+            `<input type="number" placeholder="—" disabled />`)}
+      ${field('claude plan', 'starting points only — Anthropic publishes no limits',
         `<select data-set="claudePlan">${plans.map(([v, l]) =>
           `<option value="${v}" ${c.claudePlan === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
-      ${field('claude 5-hour budget', 'tokens', num('claudeFiveHourBudget', 1000000))}
-      ${field('claude weekly budget', 'tokens', num('claudeWeeklyBudget', 10000000))}
-      ${field('codex fallback budget', 'only until Codex reports a real rate limit', num('codexFiveHourBudget', 1000000))}
+      ${field('claude 5-hour budget', 'equivalent API spend, the unit limits are consumed in', num('claudeFiveHourBudget', 1))}
+      ${field('claude weekly budget', 'equivalent API spend', num('claudeWeeklyBudget', 10))}
+      ${field('codex fallback budget', 'only until Codex reports a real rate limit', num('codexFiveHourBudget', 1))}
       ${field('opencode weekly spend', 'US dollars', num('openCodeWeeklyBudget', 5))}
       ${field('antigravity weekly spend', 'US dollars', num('antigravityWeeklyBudget', 5))}
       ${field('refresh interval', 'seconds', num('refreshSeconds', 15))}

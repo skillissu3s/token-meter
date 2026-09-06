@@ -6,6 +6,13 @@ public static class Aggregate
     public static long Sum(IEnumerable<UsageRecord> rs, bool countCacheReads) =>
         rs.Sum(r => countCacheReads ? r.Total : r.Input + r.Output + r.CacheWrite);
 
+    /// <summary>
+    /// Usage weighted the way a provider actually consumes a limit: by price rather than by a flat
+    /// token count. This is what the limit gauges measure, so that switching from Opus to Sonnet,
+    /// or a run of cache hits, moves the gauge by roughly the right amount.
+    /// </summary>
+    public static double SumWeighted(IEnumerable<UsageRecord> rs) => rs.Sum(r => r.Cost);
+
     public static IEnumerable<UsageRecord> Since(IReadOnlyList<UsageRecord> rs, DateTime utc) =>
         rs.Where(r => r.TsUtc >= utc);
 

@@ -19,6 +19,14 @@ public static class Fmt
     public static double Pct(double used, double budget) =>
         budget <= 0 ? 0 : Math.Min(100, used * 100d / budget);
 
+    /// <summary>A duration in days, rendered the way you would say it out loud.</summary>
+    public static string Span(double days) => days switch
+    {
+        < 1 / 24d => "under an hour",
+        < 1 => (int)Math.Round(days * 24) + "h",
+        _ => Math.Round(days, 1).ToString("0.#") + "d",
+    };
+
     public static string Ago(DateTime utc)
     {
         var d = DateTime.UtcNow - utc;

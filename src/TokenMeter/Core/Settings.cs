@@ -9,13 +9,19 @@ public sealed class Settings
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TokenMeter");
     static string File => Path.Combine(Dir, "settings.json");
 
-    /// <summary>Anthropic publishes no token numbers for plan limits, so these are targets you set.</summary>
+    /// <summary>
+    /// Budgets are held as equivalent API spend, not as a token count. Providers do not charge a
+    /// flat rate per token — cached input is roughly a tenth of fresh input, output several times
+    /// more, and Opus several times Sonnet — and their limits are consumed the same way. Weighting
+    /// by price is the closest a local estimate gets to how a window is actually eaten.
+    /// You are not being billed these amounts on a subscription; it is the unit, not an invoice.
+    /// </summary>
     public string ClaudePlan { get; set; } = "max5";
-    public long ClaudeFiveHourBudget { get; set; } = 88_000_000;
-    public long ClaudeWeeklyBudget { get; set; } = 880_000_000;
+    public double ClaudeFiveHourBudget { get; set; } = 88;
+    public double ClaudeWeeklyBudget { get; set; } = 700;
 
-    public long CodexFiveHourBudget { get; set; } = 12_000_000;
-    public long CodexWeeklyBudget { get; set; } = 120_000_000;
+    public double CodexFiveHourBudget { get; set; } = 25;
+    public double CodexWeeklyBudget { get; set; } = 200;
 
     /// <summary>USD/week you are comfortable spending through OpenCode's own API keys.</summary>
     public double OpenCodeWeeklyBudget { get; set; } = 50;
@@ -25,11 +31,15 @@ public sealed class Settings
     public bool CountCacheReads { get; set; } = true;
     public bool StartWithWindows { get; set; }
 
-    public static readonly Dictionary<string, (long FiveHour, long Weekly)> ClaudePlans = new()
+    /// <summary>
+    /// Starting points only. Anthropic publishes no numbers, so these are rough and the honest way
+    /// to get an accurate gauge is to calibrate against a percentage Claude Code actually showed you.
+    /// </summary>
+    public static readonly Dictionary<string, (double FiveHour, double Weekly)> ClaudePlans = new()
     {
-        ["pro"] = (19_000_000, 190_000_000),
-        ["max5"] = (88_000_000, 880_000_000),
-        ["max20"] = (220_000_000, 2_200_000_000),
+        ["pro"] = (18, 140),
+        ["max5"] = (88, 700),
+        ["max20"] = (350, 2800),
         ["custom"] = (0, 0),
     };
 

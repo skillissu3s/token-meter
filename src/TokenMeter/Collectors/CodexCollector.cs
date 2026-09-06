@@ -63,11 +63,11 @@ public sealed class CodexCollector : IUsageCollector
         // Prefer the numbers the server reported. Fall back to local budgets only when absent.
         snap.Gauges.Add(_primary is not null
             ? Reported(_primary)
-            : Budget(records, TimeSpan.FromHours(5), "5-hour window", s.CodexFiveHourBudget, cache));
+            : Budget(records, TimeSpan.FromHours(5), "5-hour window", s.CodexFiveHourBudget));
 
         snap.Gauges.Add(_secondary is not null
             ? Reported(_secondary)
-            : Budget(records, TimeSpan.FromDays(7), "Weekly window", s.CodexWeeklyBudget, cache));
+            : Budget(records, TimeSpan.FromDays(7), "Weekly window", s.CodexWeeklyBudget));
 
         var today = Aggregate.Today(records).ToList();
         snap.Stats.Add(new Stat { Label = "Today", Value = Fmt.Tokens(snap.TokensToday), Sub = Fmt.Count(today.Count, "turn") });
@@ -106,17 +106,18 @@ public sealed class CodexCollector : IUsageCollector
         Authoritative = true,
     };
 
-    static Gauge Budget(IReadOnlyList<UsageRecord> records, TimeSpan length, string label,
-        long budget, bool countCacheReads)
+    /// <summary>Only reached before Codex has reported a real rate limit; weighted like Claude's.</summary>
+    static Gauge Budget(IReadOnlyList<UsageRecord> records, TimeSpan length, string label, double budget)
     {
         var (start, end) = Aggregate.CurrentBlock(records, length);
-        var used = Aggregate.Sum(records.Where(r => r.TsUtc >= start), countCacheReads);
+        var used = Aggregate.SumWeighted(records.Where(r => r.TsUtc >= start));
         return new Gauge
         {
             Label = label,
-            Sub = Fmt.Tokens(used) + " of " + Fmt.Tokens(budget),
+            Sub = Fmt.Money(used) + " of " + Fmt.Money(budget),
             Percent = Fmt.Pct(used, budget),
-            Value = Fmt.Tokens(used),
+            Raw = used,
+            Value = Fmt.Money(used),
             WindowStartUtc = start,
             ResetsAtUtc = end,
         };

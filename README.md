@@ -26,7 +26,15 @@ The dashboard adds the master view on top: combined totals for today, the last 7
 Gauges are labelled so you always know what you are looking at:
 
 - **`live`** — the provider itself told us the percentage. Only Codex does this today.
-- **`budget`** — measured against a number *you* set. Anthropic does not publish token limits for Pro/Max plans and does not expose them to the machine, so the Claude gauges compare your usage against a target you pick in Settings. Treat it as a personal pace indicator, not an official quota.
+- **`budget`** — an estimate measured against a number *you* set. Anthropic does not publish plan limits and does not expose them to the machine, so the Claude gauges are reconstructed from your local transcripts.
+
+**Why a `budget` gauge won't exactly match the percentage Claude Code shows you**, and what to do about it:
+
+Providers do not consume a limit at a flat rate per token. Cached input costs roughly a tenth of fresh input, output several times more, and Opus several times Sonnet. Summing raw tokens therefore over-reads a cache-heavy Opus session badly. Token Meter instead weights usage by list price, which is the closest proxy available offline — but the exact weighting is Anthropic's, not published, so a gap remains.
+
+So there is a **calibrate** control in Settings. Read the percentage Claude Code is showing you right now, type it in, and Token Meter solves for the budget that would have produced it. One reading makes the gauge track properly from then on.
+
+The weekly gauge has a second, larger problem: it can only count what is in `~/.claude/projects` **on this machine**. If you use Claude Code on another machine, or your transcripts have been cleaned up, its weekly figure will read low and no calibration can fix that. It says so inline when local history is shorter than a week, and refuses to be calibrated until a full week has accumulated.
 
 Every gauge shows five things, following what [claudebar](https://github.com/mryll/claudebar) and [codexbar](https://github.com/mryll/codexbar) put in Omarchy's bar:
 
@@ -88,9 +96,10 @@ Stored as plain JSON in `%APPDATA%\TokenMeter\settings.json`, editable either in
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| Claude plan | Max 5x | Presets fill the two budgets below; pick *Custom* to type your own |
-| Claude 5-hour / weekly budget | 88M / 880M tokens | Your own target, see the note on gauges above |
-| Codex fallback budgets | 12M / 120M tokens | Only used before Codex has reported a real rate limit |
+| Calibrate 5-hour / weekly | — | Type the percentage Claude Code is showing and the budget is solved for you. The accurate route; see the note on gauges above |
+| Claude plan | Max 5x | Rough starting points, since Anthropic publishes no limits. Picking one refills the two budgets below |
+| Claude 5-hour / weekly budget | $88 / $700 | Equivalent API spend, the unit a limit is actually consumed in — **not** a bill. On a subscription you are not charged this |
+| Codex fallback budgets | $25 / $200 | Only used before Codex has reported a real rate limit |
 | OpenCode weekly spend budget | $50 | |
 | Antigravity weekly spend budget | $50 | |
 | Refresh interval | 60s | Minimum 15s |

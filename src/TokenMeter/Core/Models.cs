@@ -40,6 +40,19 @@ public sealed class Gauge
     /// where "elapsed" has no meaning.
     /// </summary>
     public DateTime? WindowStartUtc { get; set; }
+
+    /// <summary>
+    /// Usage in the same unit as the budget, unclamped. <see cref="Percent"/> stops at 100, so this
+    /// is what calibration needs in order to solve for a budget when you have overshot the current one.
+    /// </summary>
+    public double Raw { get; set; }
+
+    /// <summary>
+    /// False when solving a budget from an observed percentage would produce a wrong answer —
+    /// chiefly when local history is too short to cover the window, so <see cref="Raw"/> is only
+    /// part of the usage the provider actually counted.
+    /// </summary>
+    public bool Calibratable { get; set; } = true;
 }
 
 public sealed class Stat
