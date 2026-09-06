@@ -14,7 +14,7 @@ public sealed class PopupForm : Form
         TopMost = true;
         StartPosition = FormStartPosition.Manual;
         BackColor = Color.FromArgb(20, 20, 19);
-        ClientSize = new Size(410, 560);
+        ClientSize = new Size(410, 644);
         MinimumSize = new Size(410, 240);
         KeyPreview = true;
         Controls.Add(panel.Control);
@@ -65,7 +65,7 @@ public sealed class PopupForm : Form
     }
 
     const int Gap = 12;
-    const int PreferredHeight = 560;
+    const int PreferredHeight = 644;
     Screen? _screen;
 
     void AnchorToTray()

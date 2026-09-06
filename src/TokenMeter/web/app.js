@@ -213,7 +213,11 @@ function providerBody(p, compact) {
 
   const gauges = p.gauges.length ? section(null, p.gauges.map(gauge).join('')) : '';
 
-  if (compact) return gauges + stats + models;
+  if (compact) {
+    // The panel gets the last week; the dashboard keeps the full fortnight.
+    const week = section('7 days', barChart(p.daily.slice(-7), mode, 44));
+    return gauges + stats + week + models;
+  }
 
   const chart = section('14 days', barChart(p.daily, mode));
   const table = p.table.length ? section((p.tableTitle || '').toLowerCase(), rows(

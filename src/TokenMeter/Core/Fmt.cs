@@ -14,7 +14,9 @@ public static class Fmt
     /// <summary>"1 turn", "2 turns" — small thing, but "1 turns" reads like a bug.</summary>
     public static string Count(int n, string noun) => n + " " + noun + (n == 1 ? "" : "s");
 
-    public static string Money(double usd) => usd >= 100 ? "$" + usd.ToString("0") : "$" + usd.ToString("0.00");
+    // Cents are dropped only in the thousands; below that a pair like "$101 of $88.00" would
+    // disagree with itself across one line.
+    public static string Money(double usd) => usd >= 1000 ? "$" + usd.ToString("#,0") : "$" + usd.ToString("0.00");
 
     public static double Pct(double used, double budget) =>
         budget <= 0 ? 0 : Math.Min(100, used * 100d / budget);

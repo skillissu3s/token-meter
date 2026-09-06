@@ -4,6 +4,10 @@ A Windows tray app that keeps track of how many tokens your AI coding tools are 
 
 Click the tray coin for a quick panel. Double-click it for the full dashboard.
 
+![The Token Meter dashboard](docs/dashboard.png)
+
+*The dashboard on a fresh install: one day of local history, so the 14-day charts are mostly empty and Codex has nothing recorded yet. They fill in as you work.*
+
 Everything is read from the files those tools already write on your own machine. Token Meter makes no network calls, sends nothing anywhere, and never writes to another tool's data.
 
 ---
@@ -19,7 +23,9 @@ Each tool exposes a different shape of information, so each gets a view that sui
 | **OpenCode** | Spend-led: weekly spend against a budget you set, cost per provider and model, per-project cost — because OpenCode runs on your own API keys and records real dollars | `~/.local/share/opencode/opencode.db` |
 | **Antigravity** | Detection status, then spend and token totals once it has data to give | `~/.antigravity`, `%APPDATA%\Antigravity` and the other known locations |
 
-The dashboard adds the master view on top: combined totals for today, the last 7 days and all time; a 14-day chart across every tool; and a model leaderboard spanning all four.
+The tray panel carries the limit gauges, the day's figures, a 7-day bar chart and the model split for whichever tool you pick.
+
+The dashboard adds the master view on top: combined totals for today, the last 7 days and all time; a 14-day chart across every tool; and per-tool columns with their own 14-day history and project breakdowns.
 
 ### Two kinds of gauge
 
