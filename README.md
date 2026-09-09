@@ -68,7 +68,15 @@ cd token-meter
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-That publishes a self-contained build to `%LOCALAPPDATA%\TokenMeter`, adds a Start Menu shortcut, registers it to start with Windows, and launches it. The coin appears in your tray — if Windows tucked it into the overflow chevron, drag it onto the taskbar to keep it visible.
+That publishes a self-contained build to `%LOCALAPPDATA%\Programs\TokenMeter`, adds a Start Menu shortcut, registers a logon task so it starts with Windows, and launches it. The coin appears in your tray — if Windows tucked it into the overflow chevron, drag it onto the taskbar to keep it visible.
+
+### Starting with Windows
+
+Startup uses a **scheduled logon task**, not the `Run` registry key. The Run key is skipped when Fast Startup resumes a session rather than logging on afresh, and it races the shell, so a tray app can come up before the taskbar exists and end up with no icon. The task waits ten seconds, runs on battery, and needs no elevation. If your machine's policy refuses to create tasks, the installer falls back to the Run key automatically.
+
+The binary lives under `Programs\` rather than directly in `%LOCALAPPDATA%` for the same reason. An executable sitting in the AppData root is the classic malware-persistence shape, and on some machines Windows silently refuses to launch one from a logon task or Run key — no error, no event log entry, it simply never starts. `%LOCALAPPDATA%\TokenMeter` is still used, but only for data that is never executed.
+
+Every launch appends a line to `%APPDATA%\TokenMeter\startup.log`, so if the tray is ever empty after signing in you can tell whether Windows started it at all. **Startup log** in the tray menu opens it.
 
 To update after pulling changes, run `install.ps1` again. To remove it completely:
 
@@ -93,7 +101,7 @@ dotnet build src/TokenMeter -c Release
 | **Double-click the tray icon** | The full dashboard opens. |
 | **Tabs in the panel** | Switch between the four tools. Your last tab is remembered. |
 | **Refresh button**, or `Ctrl+R` | Re-reads everything immediately. It also refreshes on its own every 60 seconds. |
-| **Right-click the tray icon** | Dashboard, panel, refresh now, start-with-Windows toggle, quit. |
+| **Right-click the tray icon** | Dashboard, panel, refresh now, start-with-Windows toggle, startup log, quit. |
 | **Gear icon on the dashboard** | Settings. |
 
 ### Settings
@@ -138,7 +146,7 @@ Stored as plain JSON in `%APPDATA%\TokenMeter\settings.json`, editable either in
 **Check what a collector actually sees:**
 
 ```powershell
-& "$env:LOCALAPPDATA\TokenMeter\TokenMeter.exe" --dump snapshot.json
+& "$env:LOCALAPPDATA\Programs\TokenMeter\TokenMeter.exe" --dump snapshot.json
 ```
 
 That writes the exact payload the UI renders, then exits without touching the tray.

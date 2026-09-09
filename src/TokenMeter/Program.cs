@@ -23,7 +23,13 @@ static class Program
 
         // One tray icon is enough; a second launch just exits.
         using var single = new Mutex(true, "TokenMeter.SingleInstance", out var isFirst);
-        if (!isFirst) return;
+        if (!isFirst)
+        {
+            Startup.RecordLaunch("duplicate, already running");
+            return;
+        }
+
+        Startup.RecordLaunch(args.Contains("--autostart") ? "autostart" : "manual");
 
         ApplicationConfiguration.Initialize();
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);

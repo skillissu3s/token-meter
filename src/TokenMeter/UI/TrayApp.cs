@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using TokenMeter.Core;
 
@@ -17,6 +18,7 @@ public sealed class TrayApp : ApplicationContext
     PopupForm? _popup;
     DashboardForm? _dashboard;
     Icon? _currentTrayIcon;
+    TrayIconHost? _iconHost;
     bool _refreshing;
 
     public TrayApp(bool openDashboard = false, bool openPanel = false)
@@ -38,6 +40,13 @@ public sealed class TrayApp : ApplicationContext
         {
             if (e.Button == MouseButtons.Left) _ = ShowDashboardAsync();
         };
+
+        // If Explorer restarts, or was not ready when we launched at logon, put the icon back.
+        _iconHost = new TrayIconHost(() =>
+        {
+            _tray.Visible = false;
+            _tray.Visible = true;
+        });
 
         _usage.Updated += OnUsageUpdated;
 
@@ -98,6 +107,7 @@ public sealed class TrayApp : ApplicationContext
             _settings.Save();
         };
         menu.Items.Add(startup);
+        menu.Items.Add("Startup log", null, (_, _) => OpenFile(Startup.LogPath));
 
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => Quit());
@@ -251,12 +261,22 @@ public sealed class TrayApp : ApplicationContext
         e.TryGetProperty(n, out var v) && v.ValueKind is JsonValueKind.True or JsonValueKind.False
             ? v.GetBoolean() : fallback;
 
+    static void OpenFile(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) Startup.RecordLaunch("log opened before any launch was recorded");
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch { }
+    }
+
     static void OpenFolder(string path)
     {
         try
         {
             Directory.CreateDirectory(path);
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path)
+            Process.Start(new ProcessStartInfo(path)
             {
                 UseShellExecute = true,
             });
@@ -267,6 +287,7 @@ public sealed class TrayApp : ApplicationContext
     void Quit()
     {
         _timer.Stop();
+        _iconHost?.Dispose();
         _tray.Visible = false;
         _tray.Dispose();
         _popup?.Dispose();
